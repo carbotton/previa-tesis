@@ -1,2 +1,2 @@
-Este codigo genera un mandelbrot set. Comentarios en español indicando como modificar los parametros para que el set se vea mas grande, mas chico, mas definido, mas deformado...
+Este codigo genera un mandelbrot set y cambia los colores cada segundo.
 
