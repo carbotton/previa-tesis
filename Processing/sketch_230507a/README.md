@@ -1,2 +1,2 @@
-Este codigo reproduce un midi y genera un mandelbrot en blanco y negro que va cambiando tonalidades
+Este codigo genera un mandelbrot set. Comentarios en español indicando como modificar los parametros para que el set se vea mas grande, mas chico, mas definido, mas deformado...
 
