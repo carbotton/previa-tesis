@@ -53,6 +53,8 @@ while True:
     if not ret:
         break
 
+    frame = cv2.flip(frame, 1)  # flip frame horizontally
+    
     # Get hand landmarks
     results = hands.process(frame)
     if results.multi_hand_landmarks:
@@ -83,12 +85,11 @@ while True:
         mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
         cv2.putText(frame, 'Index finger', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
 
-    alpha = 0.5
-
     # print(overlay_img.shape)  # should be (height, width, num_channels)
     # print(frame.shape)  # should be (height, width, num_channels)
     overlay_img = cv2.resize(overlay_img, (frame.shape[1], frame.shape[0])) # esta linea es porque los sizes daban (720, 1280, 3) y (480, 640, 3) y eso daba error en cv2.addWeighted()
 
+    alpha = 0.5
     cv2.addWeighted(overlay_img, alpha, frame, 1 - alpha, 0, frame)  # blends 2 images; result stored in frame
     cv2.imshow('Hand Tracking', frame)  # display frame image in a window titled Hand Tracking
     if cv2.waitKey(1) & 0xFF == ord('q'):  # wait for key press for 1 second. If 'q' is pressed, programm exits.
@@ -101,5 +102,5 @@ hands.close()  # release HandTracker object and free up any resources being used
 stream.stop_stream()
 stream.close()
 p.terminate()
-cv2.destroyAllWindows() 
+cv2.destroyAllWindows()
 
