@@ -24,6 +24,9 @@ def map_to_a_minor(pitch):
 
     return pitch_in_scale
 
+def map_to_midi_range(value):
+    return int((value/2000)*127)
+
 
 # Setup audio stream
 p = pyaudio.PyAudio()
@@ -46,6 +49,10 @@ cap = cv2.VideoCapture(0)  # set up computer's webcam as video source for hand t
 # Load image to overlay
 overlay_img = cv2.imread('source/imgs/bars_colors.jpg', cv2.IMREAD_UNCHANGED)
 overlay_img = cv2.resize(overlay_img, (1280, 720))
+
+# Set up virtual midi port
+print(mido.get_output_names())
+outport = mido.open_output('loopmidi 1')
 
 while True:
     # Get camera frame
@@ -74,12 +81,17 @@ while True:
         pitch = int(np.interp(hue, [0, 255], [100, 2000]))
         pitch = map_to_a_minor(pitch)
 
+        # Send midi note
+        #print('pitch', pitch)
+        #print(map_to_midi_range(pitch))
+        outport.send(mido.Message('note_on', note=map_to_midi_range(pitch), velocity=64))
+
         # Generate sine wave
-        frequency = 440 * (2 ** ((pitch - 1000) / 1200))  # convert pitch to frequency in Hz. Formula for equal temperament tuning
-        sine_wave = np.sin(2 * np.pi * frequency * t).astype(np.float32)
+        #frequency = 440 * (2 ** ((pitch - 1000) / 1200))  # convert pitch to frequency in Hz. Formula for equal temperament tuning
+        #sine_wave = np.sin(2 * np.pi * frequency * t).astype(np.float32)
 
         # Play sine wave
-        stream.write(sine_wave)
+        #stream.write(sine_wave)
 
         # Draw finger position and overlay image on frame
         mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
@@ -103,4 +115,4 @@ stream.stop_stream()
 stream.close()
 p.terminate()
 cv2.destroyAllWindows()
-
+outport.close() # close midi port
