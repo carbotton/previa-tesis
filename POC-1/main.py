@@ -48,7 +48,7 @@ t = np.linspace(0, duration, int(sample_rate * duration), False)  # represents t
 cap = cv2.VideoCapture(0)  # set up computer's webcam as video source for hand tracking
 
 # Load image to overlay
-overlay_img = cv2.imread('source/imgs/mandelbrot.jpg', cv2.IMREAD_UNCHANGED)
+overlay_img = cv2.imread('source/imgs/bars_colors.jpg', cv2.IMREAD_UNCHANGED)
 overlay_img = cv2.resize(overlay_img, (1280, 720))
 
 # Set up virtual midi port
