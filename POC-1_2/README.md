@@ -1,0 +1,1 @@
+venv con magenta instalado
