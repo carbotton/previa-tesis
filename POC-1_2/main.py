@@ -3,6 +3,9 @@ import numpy as np
 import pyaudio
 import cv2  # for image processing
 import mido
+from mido import MidiFile
+import glob # to find first midi in directory
+import subprocess   # to execute bash commands
 
 def map_to_a_minor(pitch):
     pitch_class = (pitch - 21) % 12
@@ -49,8 +52,24 @@ def process_hand_landmarks(frame, hand_landmarks, mp_drawing, mp_hands, overlay_
     r, g, b,  = overlay_color
     hue = (r + g + b) / 3  # average hue value of overlay color
     new_pitch = int(np.interp(hue, [0, 255], [100, 2000]))
-    new_pitch = map_to_a_minor(new_pitch)
-    outport.send(mido.Message('note_on', note=map_to_midi_range(new_pitch), velocity=64))
+    #new_pitch = map_to_a_minor(new_pitch)
+
+    # this will generate a polyphonic sequence using a C Major chord as a primer.
+    # magenta_cmd = 'polyphony_rnn_generate --bundle-file=${modelos-prentrenados/polyphony_rnn.mag} --output_dir=source/midis_magenta --num_outputs=1 --num_steps=128 --primer_pitches="['+str(new_pitch)+']" --condition_on_primer=true --inject_primer_during_generation=false'
+    magenta_cmd = 'melody_rnn_generate --config=basic_rnn --bundle_file=modelos-prentrenados/basic_rnn.mag  --output_dir=source/midis_magenta --num_outputs=1 --num_steps=128 --primer_melody="[60]"'
+    subprocess.run(magenta_cmd, shell=True) # espera a que termine de ejecutarse el comando antes de seguir
+
+    directory_path = 'source/midis_magenta'
+    midi_files = glob.glob(f"{directory_path}/*.mid")
+    if len(midi_files) > 0:
+        first_midi_file = midi_files[0]
+        midi_file = MidiFile(first_midi_file)
+        for message in midi_file:
+            if message.type == 'note_on':
+                print(f"Note: {message.note}, Velocity: {message.velocity}, Time: {message.time}")
+                outport.send(mido.Message('note_on', note=message.note, velocity=message.velocity))
+    else:
+        print("No MIDI files found in the directory.")
 
     mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
     cv2.putText(frame, 'Index finger', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
