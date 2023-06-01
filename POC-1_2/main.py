@@ -3,9 +3,6 @@ import numpy as np
 import pyaudio
 import cv2  # for image processing
 import mido
-from mido import MidiFile
-import glob # to find first midi in directory
-import subprocess   # to execute bash commands
 
 def map_to_a_minor(pitch):
     pitch_class = (pitch - 21) % 12
@@ -42,37 +39,94 @@ def setup_midi_port():
     outport = mido.open_output('loopmidi 1')
     return outport
 
-def process_hand_landmarks(frame, hand_landmarks, mp_drawing, mp_hands, overlay_img, outport):
+def get_index_finger_position(frame, hand_landmarks, mp_hands):
+    """
+    Get the position of the index finger tip.
+
+    Args:
+        frame: The input frame or image.
+        hand_landmarks: Hand landmarks obtained from hand tracking.
+        mp_hands: mediapipe Hands module.
+
+    Returns:
+        x: x-coordinate of the index finger tip.
+        y: y-coordinate of the index finger tip.
+    """
     index_finger_landmark = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
     x, y = int(index_finger_landmark.x * frame.shape[1]), int(index_finger_landmark.y * frame.shape[0])
+    return x, y
 
+def draw_index_finger_circle(frame, x, y, overlay_img):
+    """
+    Draw a circle around the index finger tip.
+
+    Args:
+        frame: The input frame or image.
+        x: x-coordinate of the index finger tip.
+        y: y-coordinate of the index finger tip.
+        overlay_img: The overlay image used for color.
+
+    Returns:
+        overlay_color: The color of the overlay at the index finger tip.
+    """
     overlay_color = tuple(map(int, overlay_img[y, x]))
     cv2.circle(frame, (x, y), 5, overlay_color, -1)
+    return overlay_color
 
+def send_midi_signal(outport, overlay_color):
+    """
+    Send MIDI signal based on the overlay color.
+
+    Args:
+        outport: The MIDI output port to send the signal.
+        overlay_color: The color of the overlay at the index finger tip.
+    """
     r, g, b,  = overlay_color
     hue = (r + g + b) / 3  # average hue value of overlay color
     new_pitch = int(np.interp(hue, [0, 255], [100, 2000]))
-    #new_pitch = map_to_a_minor(new_pitch)
+    new_pitch = map_to_a_minor(new_pitch)
+    outport.send(mido.Message('note_on', note=map_to_midi_range(new_pitch), velocity=64))
 
-    # this will generate a polyphonic sequence using a C Major chord as a primer.
-    # magenta_cmd = 'polyphony_rnn_generate --bundle-file=${modelos-prentrenados/polyphony_rnn.mag} --output_dir=source/midis_magenta --num_outputs=1 --num_steps=128 --primer_pitches="['+str(new_pitch)+']" --condition_on_primer=true --inject_primer_during_generation=false'
-    magenta_cmd = 'melody_rnn_generate --config=basic_rnn --bundle_file=modelos-prentrenados/basic_rnn.mag  --output_dir=source/midis_magenta --num_outputs=1 --num_steps=128 --primer_melody="[60]"'
-    subprocess.run(magenta_cmd, shell=True) # espera a que termine de ejecutarse el comando antes de seguir
+def draw_hand_landmarks(frame, hand_landmarks, mp_drawing, mp_hands):
+    """
+    Draw hand landmarks on the frame.
 
-    directory_path = 'source/midis_magenta'
-    midi_files = glob.glob(f"{directory_path}/*.mid")
-    if len(midi_files) > 0:
-        first_midi_file = midi_files[0]
-        midi_file = MidiFile(first_midi_file)
-        for message in midi_file:
-            if message.type == 'note_on':
-                print(f"Note: {message.note}, Velocity: {message.velocity}, Time: {message.time}")
-                outport.send(mido.Message('note_on', note=message.note, velocity=message.velocity))
-    else:
-        print("No MIDI files found in the directory.")
-
+    Args:
+        frame: The input frame or image.
+        hand_landmarks: Hand landmarks obtained from hand tracking.
+        mp_drawing: mediapipe Drawing module.
+        mp_hands: mediapipe Hands module.
+    """
     mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+def label_index_finger(frame, x, y):
+    """
+    Label the index finger on the frame.
+
+    Args:
+        frame: The input frame or image.
+        x: x-coordinate of the index finger tip.
+        y: y-coordinate of the index finger tip.
+    """
     cv2.putText(frame, 'Index finger', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
+
+def process_hand_landmarks(frame, hand_landmarks, mp_drawing, mp_hands, overlay_img, outport):
+    """
+    Process hand landmarks by performing various actions.
+
+    Args:
+        frame: The input frame or image.
+        hand_landmarks: Hand landmarks obtained from hand tracking.
+        mp_drawing: mediapipe Drawing module.
+        mp_hands: mediapipe Hands module.
+        overlay_img: The overlay image used for color.
+        outport: The MIDI output port to send the signal.
+    """
+    x, y = get_index_finger_position(frame, hand_landmarks, mp_hands)
+    overlay_color = draw_index_finger_circle(frame, x, y, overlay_img)
+    send_midi_signal(outport, overlay_color)
+    draw_hand_landmarks(frame, hand_landmarks, mp_drawing, mp_hands)
+    label_index_finger(frame, x, y)
 
 def cleanup(cap, hands, stream, p, outport):
     cap.release()
@@ -110,6 +164,7 @@ def main():
             break
 
     cleanup(cap, hands, stream, p, outport)
+
 
 if __name__ == "__main__":
     main()
